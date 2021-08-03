@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -134,5 +135,56 @@ func TestByteBufferGetStringConcurrent(t *testing.T) {
 		case <-time.After(time.Second):
 			t.Fatalf("timeout!")
 		}
+	}
+}
+
+func TestByteBufferWriteAtSerial(t *testing.T) {
+	var b ByteBuffer
+
+	_, err := b.WriteString("abcdefghij")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	wb := []byte("0123456789")
+	expectedS := "abcde0123456789"
+
+	if _, err = b.WriteAt(wb, 5); err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	res := b.String()
+	if res != expectedS {
+		t.Fatalf("unexpected result: %q. Expecting %q", res, expectedS)
+	}
+}
+
+func TestByteBufferWriteAtConcurrent(t *testing.T) {
+	var b ByteBuffer
+	concurrency := 10
+	ch := make(chan struct{}, concurrency)
+	for i := 0; i < concurrency; i++ {
+		go func(tt *testing.T, bb *ByteBuffer, idx int) {
+			str := strconv.Itoa(idx)
+			if _, err := bb.WriteAt([]byte(str+str), int64(idx*2)); err != nil {
+				tt.Fatalf("unexpected error: %s", err)
+			}
+
+			ch <- struct{}{}
+		}(t, &b, i)
+	}
+
+	for i := 0; i < concurrency; i++ {
+		select {
+		case <-ch:
+		case <-time.After(time.Second):
+			t.Fatalf("timeout!")
+		}
+	}
+
+	res := b.String()
+	expectedS := "00112233445566778899"
+	if res != expectedS {
+		t.Fatalf("unexpected result: %q. Expecting %q", res, expectedS)
 	}
 }

@@ -1,6 +1,10 @@
 package bytebufferpool
 
-import "io"
+import (
+	"io"
+
+	"sync"
+)
 
 // ByteBuffer provides byte buffer, which can be used for minimizing
 // memory allocations.
@@ -10,7 +14,7 @@ import "io"
 //
 // Use Get for obtaining an empty byte buffer.
 type ByteBuffer struct {
-
+	m sync.Mutex
 	// B is a byte buffer to use in append-like workloads.
 	// See example code for details.
 	B []byte
@@ -108,4 +112,28 @@ func (b *ByteBuffer) String() string {
 // Reset makes ByteBuffer.B empty.
 func (b *ByteBuffer) Reset() {
 	b.B = b.B[:0]
+}
+
+// WriteAt writes a slice of bytes to a buffer starting at the position provided
+// The number of bytes written will be returned, or error. Can overwrite previous
+// written slices if the write ats overlap.
+func (b *ByteBuffer) WriteAt(p []byte, pos int64) (n int, err error) {
+	n = len(p)
+	expLen := pos + int64(n)
+
+	b.m.Lock()
+	defer b.m.Unlock()
+
+	diffCap := expLen - int64(cap(b.B))
+
+	if expLen-int64(len(b.B)) > 0 {
+		if diffCap > 0 {
+			b.B = append(b.B[:cap(b.B)], make([]byte, diffCap)...)
+		}
+
+		b.B = b.B[:expLen]
+	}
+
+	copy(b.B[pos:], p)
+	return n, nil
 }
