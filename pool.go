@@ -4,6 +4,7 @@ import (
 	"sort"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 const (
@@ -51,7 +52,19 @@ func (p *Pool) Get() *ByteBuffer {
 		return v.(*ByteBuffer)
 	}
 	return &ByteBuffer{
-		B: make([]byte, 0, atomic.LoadUint64(&p.defaultSize)),
+		B:       make([]byte, 0, atomic.LoadUint64(&p.defaultSize)),
+		Created: time.Now(),
+	}
+}
+
+// GetFresh returns new byte buffer with zero length, created in period
+func (p *Pool) GetFresh(duration time.Duration) *ByteBuffer {
+	for {
+		result := p.Get()
+
+		if time.Since(result.Created) < duration {
+			return result
+		}
 	}
 }
 

@@ -2,8 +2,8 @@ package bytebufferpool
 
 import (
 	"io"
-
 	"sync"
+	"time"
 )
 
 // ByteBuffer provides byte buffer, which can be used for minimizing
@@ -17,7 +17,8 @@ type ByteBuffer struct {
 	m sync.Mutex
 	// B is a byte buffer to use in append-like workloads.
 	// See example code for details.
-	B []byte
+	B       []byte
+	Created time.Time
 }
 
 // Len returns the size of the byte buffer.
